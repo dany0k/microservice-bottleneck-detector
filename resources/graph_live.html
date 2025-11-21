@@ -1,0 +1,63 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Runtime Graph</title>
+  <link href="/lib/vis-9.1.2/vis-network.css" rel="stylesheet" type="text/css" />
+  <style>
+    #mynetwork { width: 100%; height: 80vh; border: 1px solid lightgray; }
+    #controls { margin: 8px 0; }
+    button { margin-right: 8px; }
+    #status { font-size: 0.9em; color: #333; margin-left: 12px }
+  </style>
+</head>
+<body>
+  <h3>Runtime Service Graph</h3>
+  <div id="controls">
+    <button id="btn-window">Last Window</button>
+    <button id="btn-agg">Aggregated Topology</button>
+    <span id="status">endpoint: <b id="ep">/graph-agg</b></span>
+  </div>
+  <div id="mynetwork"></div>
+  <script src="/lib/vis-9.1.2/vis-network.min.js"></script>
+  <script>
+    const container = document.getElementById('mynetwork');
+    let network = null;
+    let endpoint = '/graph-agg';
+    const epLabel = document.getElementById('ep');
+
+    function updateStatus() { epLabel.textContent = endpoint; }
+
+    function updateGraph(data) {
+      const nodes = new vis.DataSet((data.nodes||[]).map(n => ({id: n.id, label: n.label, title: n.title, value: n.size, color: n.color}))); 
+      const edges = new vis.DataSet((data.edges||[]).map(e => ({from: e.from, to: e.to, label: e.label, color: e.color, width: e.width}))); 
+      const ds = {nodes: nodes, edges: edges};
+      if (!network) {
+        network = new vis.Network(container, ds, {physics: {stabilization: true}, edges: {smooth: {type: 'dynamic'}}});
+      } else {
+        network.setData(ds);
+      }
+    }
+
+    async function poll() {
+      try {
+        const r = await fetch(endpoint);
+        if (r.status === 200) {
+          const d = await r.json();
+          updateGraph(d);
+        }
+      } catch (e) {
+        console.warn(e);
+      }
+    }
+
+    document.getElementById('btn-window').addEventListener('click', () => { endpoint = '/graph-data'; updateStatus(); poll(); });
+    document.getElementById('btn-agg').addEventListener('click', () => { endpoint = '/graph-agg'; updateStatus(); poll(); });
+
+    // default: aggregated topology
+    updateStatus();
+    poll();
+    setInterval(poll, 3000);
+  </script>
+</body>
+</html>
